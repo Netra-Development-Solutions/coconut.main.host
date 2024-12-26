@@ -6,8 +6,8 @@ on:
 
 jobs:
   build-and-deploy:
-    runs-on: ubuntu-latests
-    if: github.event.pull_request.merged == true  # Only proceed if the PR is merged
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.merged == true
 
     steps:
     # Checkout the code
