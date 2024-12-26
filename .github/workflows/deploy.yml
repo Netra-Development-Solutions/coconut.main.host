@@ -1,0 +1,53 @@
+name: Deploy React Plugin to S3
+
+on:
+  workflow_dispatch:
+    inputs:
+      plugin:
+        description: "Select the plugin to deploy (e.g., plugin1, plugin2, plugin3)"
+        required: true
+        default: "app-host"
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    # Checkout the code
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    # Validate input against predefined plugin names
+    - name: Validate Plugin Input
+      id: validate-input
+      run: |
+        VALID_PLUGINS=("app-host" "plugin2")
+        if [[ ! " ${VALID_PLUGINS[@]} " =~ " ${{ github.event.inputs.plugin }} " ]]; then
+          echo "Invalid plugin: ${{ github.event.inputs.plugin }}. Valid options are: ${VALID_PLUGINS[@]}"
+          exit 1
+        fi
+        echo "PLUGIN_DIR=${{ github.event.inputs.plugin }}" >> $GITHUB_ENV
+
+    # Navigate to the plugin directory and install dependencies
+    - name: Install Dependencies
+      run: |
+        cd $PLUGIN_DIR
+        npm install
+
+    # Build the selected plugin
+    - name: Build React Plugin
+      run: |
+        cd $PLUGIN_DIR
+        npm run build
+
+    # Deploy to S3
+    - name: Deploy to S3
+      uses: jakejarvis/s3-sync-action@v0.5.1
+      with:
+        args: --acl public-read --delete
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_S3_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_S3_SECRET_ACCESS_KEY }}
+        AWS_REGION: ${{ secrets.AWS_REGION }}
+        S3_BUCKET: ${{ secrets.AWS_S3_BUCKET_NAME }}
+        SOURCE_DIR: "${{ env.PLUGIN_DIR }}/build"
