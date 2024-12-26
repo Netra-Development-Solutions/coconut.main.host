@@ -2,13 +2,17 @@ const HtmlWebPackPlugin = require("html-webpack-plugin");
 const ModuleFederationPlugin = require("webpack/lib/container/ModuleFederationPlugin");
 const path = require('path');
 const Dotenv = require('dotenv-webpack');
-
+const packageJson = require("./package.json");
+const deps = packageJson.dependencies;
+const version = packageJson.version;
 const deps = require("./package.json").dependencies;
 
 const printCompilationMessage = require('./compilation.config.js');
 
 module.exports = (_, argv) => ({
-  output: {
+  output: argv.mode === "production" ? {
+    publicPath: `https://coconut-plugin-architecture.s3.ap-south-1.amazonaws.com/plugins/${packageJson.name}/v${version}/`,
+  } : {
     publicPath: "http://localhost:2200/",
   },
 
