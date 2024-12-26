@@ -1,5 +1,3 @@
-name: Deploy React Plugin to S3
-
 on:
   workflow_dispatch:
     inputs:
@@ -40,14 +38,31 @@ jobs:
         cd $PLUGIN_DIR
         npm run build
 
-    # Deploy to S3
+    # Extract version from package.json
+    - name: Get Version from package.json
+      id: get-version
+      run: |
+        VERSION=$(jq -r '.version' $PLUGIN_DIR/package.json)
+        echo "PLUGIN_VERSION=$VERSION" >> $GITHUB_ENV
+        echo "Using version: $VERSION"
+
+    # Define the S3 directory path using version and plugin name
+    - name: Define S3 Directory Path
+      id: define-s3-path
+      run: |
+        S3_DIR_PATH="plugins/${{ github.event.inputs.plugin }}/v${{ env.PLUGIN_VERSION }}"
+        echo "S3_DIR_PATH=$S3_DIR_PATH" >> $GITHUB_ENV
+        echo "S3 path set to: $S3_DIR_PATH"
+
+    # Deploy to S3 (no delete option to avoid removal of old files)
     - name: Deploy to S3
       uses: jakejarvis/s3-sync-action@v0.5.1
       with:
-        args: --acl public-read --delete
+        args: --acl public-read
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_S3_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_S3_SECRET_ACCESS_KEY }}
         AWS_REGION: ${{ secrets.AWS_REGION }}
         AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET_NAME }}
         SOURCE_DIR: "${{ env.PLUGIN_DIR }}/dist"
+        DEST_DIR: "${{ env.S3_DIR_PATH }}"
