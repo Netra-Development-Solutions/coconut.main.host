@@ -6,7 +6,7 @@ on:
 
 jobs:
   build-and-deploy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latests
     if: github.event.pull_request.merged == true  # Only proceed if the PR is merged
 
     steps:
@@ -64,9 +64,7 @@ jobs:
     # Deploy the selected plugins
     - name: Deploy Plugins
       run: |
-        DEPLOYED_SUCCESSFULLY=()
         for plugin in ${PLUGINS_TO_DEPLOY[@]}; do
-          echo "Deploying $plugin..."
           PLUGIN_DIR=$plugin
           cd $PLUGIN_DIR
           npm install
@@ -78,8 +76,7 @@ jobs:
           S3_DIR_PATH="plugins/$plugin/v$VERSION"
           echo "S3_DIR_PATH=$S3_DIR_PATH" >> $GITHUB_ENV
 
-          # Attempt deployment and handle errors
-          set +e  # Allow script to continue even if this step fails
+          # Deploy the plugin to S3
           uses: jakejarvis/s3-sync-action@v0.5.1
           with:
             args: --acl public-read
@@ -90,31 +87,18 @@ jobs:
             AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET_NAME }}
             SOURCE_DIR: "$PLUGIN_DIR/dist"
             DEST_DIR: "$S3_DIR_PATH"
-          set -e  # Re-enable error checking
-
-          # Check if the plugin was deployed successfully
-          if [ $? -eq 0 ]; then
-            DEPLOYED_SUCCESSFULLY+=($plugin)
-            echo "Successfully deployed $plugin"
-          else
-            echo "Failed to deploy $plugin"
-          fi
         done
 
-        echo "DEPLOYED_SUCCESSFULLY=${DEPLOYED_SUCCESSFULLY[@]}" >> $GITHUB_ENV
-
-    # Update the plugin metadata for successfully deployed plugins
+    # Update the plugin metadata after deployment
     - name: Update Plugin Metadata
       run: |
         # Extract the current plugin metadata
         PLUGIN_METADATA_JSON=$(echo $PLUGIN_METADATA | jq -r 'fromjson')
 
-        # Update the deployed plugin versions for successful deployments
-        for plugin in ${DEPLOYED_SUCCESSFULLY[@]}; do
+        # Update the deployed plugin versions
+        for plugin in ${PLUGINS_TO_DEPLOY[@]}; do
           VERSION=$(jq -r '.version' "$plugin/package.json")
-          # Ensure the deployed versions are an array and then append the version
-          PLUGIN_METADATA_JSON=$(echo $PLUGIN_METADATA_JSON | jq --arg plugin "$plugin" --arg version "$VERSION" \
-            '.deployed_plugin_versions[$plugin] += [$version]')
+          PLUGIN_METADATA_JSON=$(echo $PLUGIN_METADATA_JSON | jq --arg plugin "$plugin" --arg version "$VERSION" '.deployed_plugin_versions[$plugin] += [$version]')
         done
 
         # Add new plugins to the metadata
