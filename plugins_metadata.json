@@ -1,0 +1,10 @@
+{
+    "deployed_plugin_versions": {
+      "app-host": ["1.0.0"]
+    },
+    "available_plugins": [
+      "app-host"
+    ],
+    "new_plugins": []
+  }
+  
