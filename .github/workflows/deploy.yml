@@ -1,68 +1,127 @@
 on:
-  workflow_dispatch:
-    inputs:
-      plugin:
-        description: "Select the plugin to deploy (e.g., plugin1, plugin2, plugin3)"
-        required: true
-        default: "app-host"
+  pull_request:
+    types: [closed]
+    branches:
+      - main  # Trigger on merged PR to main branch
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    if: github.event.pull_request.merged == true  # Only proceed if the PR is merged
 
     steps:
     # Checkout the code
     - name: Checkout Code
       uses: actions/checkout@v3
 
-    # Validate input against predefined plugin names
-    - name: Validate Plugin Input
-      id: validate-input
+    # Fetch the plugin metadata
+    - name: Fetch Plugin Metadata
+      id: fetch-metadata
       run: |
-        VALID_PLUGINS=("app-host" "plugin2")
-        if [[ ! " ${VALID_PLUGINS[@]} " =~ " ${{ github.event.inputs.plugin }} " ]]; then
-          echo "Invalid plugin: ${{ github.event.inputs.plugin }}. Valid options are: ${VALID_PLUGINS[@]}"
-          exit 1
+        git fetch origin main
+        if [ -f plugins_metadata.json ]; then
+          PLUGIN_METADATA=$(cat plugins_metadata.json)
+        else
+          PLUGIN_METADATA='{"deployed_plugin_versions": {}, "available_plugins": [], "new_plugins": []}'
         fi
-        echo "PLUGIN_DIR=${{ github.event.inputs.plugin }}" >> $GITHUB_ENV
+        echo "PLUGIN_METADATA=$PLUGIN_METADATA" >> $GITHUB_ENV
 
-    # Navigate to the plugin directory and install dependencies
-    - name: Install Dependencies
+    # Get a list of available plugins from the plugins_metadata.json
+    - name: Get List of Available Plugins
+      id: get-plugins
       run: |
-        cd $PLUGIN_DIR
-        npm install
+        AVAILABLE_PLUGINS=$(echo $PLUGIN_METADATA | jq -r '.available_plugins[]')
+        echo "AVAILABLE_PLUGINS=${AVAILABLE_PLUGINS}" >> $GITHUB_ENV
 
-    # Build the selected plugin
-    - name: Build React Plugin
+    # Determine which plugins need to be deployed (new or version update)
+    - name: Determine Plugins to Deploy
+      id: plugins-to-deploy
       run: |
-        cd $PLUGIN_DIR
-        npm run build
+        # Extract deployed plugin versions from metadata
+        DEPLOYED_PLUGINS=$(echo $PLUGIN_METADATA | jq -r '.deployed_plugin_versions')
+        PLUGINS_TO_DEPLOY=()
+        NEW_PLUGINS=()
 
-    # Extract version from package.json
-    - name: Get Version from package.json
-      id: get-version
+        for plugin in ${AVAILABLE_PLUGINS[@]}; do
+          # Extract deployed versions for the current plugin
+          DEPLOYED_VERSIONS=$(echo $DEPLOYED_PLUGINS | jq -r ".\"$plugin\" // []")
+          
+          # Get the current version from the plugin's package.json
+          CURRENT_VERSION=$(jq -r '.version' "$plugin/package.json")
+          
+          # Check if the plugin is new or if the version has changed
+          if [[ ! "$DEPLOYED_VERSIONS" =~ "$CURRENT_VERSION" ]]; then
+            if [ -z "$DEPLOYED_VERSIONS" ]; then
+              NEW_PLUGINS+=($plugin)
+            fi
+            PLUGINS_TO_DEPLOY+=($plugin)
+          fi
+        done
+
+        echo "PLUGINS_TO_DEPLOY=${PLUGINS_TO_DEPLOY[@]}" >> $GITHUB_ENV
+        echo "NEW_PLUGINS=${NEW_PLUGINS[@]}" >> $GITHUB_ENV
+
+    # Deploy the selected plugins
+    - name: Deploy Plugins
       run: |
-        VERSION=$(jq -r '.version' $PLUGIN_DIR/package.json)
-        echo "PLUGIN_VERSION=$VERSION" >> $GITHUB_ENV
-        echo "Using version: $VERSION"
+        DEPLOYED_SUCCESSFULLY=()
+        for plugin in ${PLUGINS_TO_DEPLOY[@]}; do
+          echo "Deploying $plugin..."
+          PLUGIN_DIR=$plugin
+          cd $PLUGIN_DIR
+          npm install
+          npm run build
+          VERSION=$(jq -r '.version' package.json)
+          echo "PLUGIN_VERSION=$VERSION" >> $GITHUB_ENV
 
-    # Define the S3 directory path using version and plugin name
-    - name: Define S3 Directory Path
-      id: define-s3-path
+          # Define the S3 path for the plugin deployment
+          S3_DIR_PATH="plugins/$plugin/v$VERSION"
+          echo "S3_DIR_PATH=$S3_DIR_PATH" >> $GITHUB_ENV
+
+          # Attempt deployment and handle errors
+          set +e  # Allow script to continue even if this step fails
+          uses: jakejarvis/s3-sync-action@v0.5.1
+          with:
+            args: --acl public-read
+          env:
+            AWS_ACCESS_KEY_ID: ${{ secrets.AWS_S3_ACCESS_KEY_ID }}
+            AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_S3_SECRET_ACCESS_KEY }}
+            AWS_REGION: ${{ secrets.AWS_REGION }}
+            AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET_NAME }}
+            SOURCE_DIR: "$PLUGIN_DIR/dist"
+            DEST_DIR: "$S3_DIR_PATH"
+          set -e  # Re-enable error checking
+
+          # Check if the plugin was deployed successfully
+          if [ $? -eq 0 ]; then
+            DEPLOYED_SUCCESSFULLY+=($plugin)
+            echo "Successfully deployed $plugin"
+          else
+            echo "Failed to deploy $plugin"
+          fi
+        done
+
+        echo "DEPLOYED_SUCCESSFULLY=${DEPLOYED_SUCCESSFULLY[@]}" >> $GITHUB_ENV
+
+    # Update the plugin metadata for successfully deployed plugins
+    - name: Update Plugin Metadata
       run: |
-        S3_DIR_PATH="plugins/${{ github.event.inputs.plugin }}/v${{ env.PLUGIN_VERSION }}"
-        echo "S3_DIR_PATH=$S3_DIR_PATH" >> $GITHUB_ENV
-        echo "S3 path set to: $S3_DIR_PATH"
+        # Extract the current plugin metadata
+        PLUGIN_METADATA_JSON=$(echo $PLUGIN_METADATA | jq -r 'fromjson')
 
-    # Deploy to S3 (no delete option to avoid removal of old files)
-    - name: Deploy to S3
-      uses: jakejarvis/s3-sync-action@v0.5.1
-      with:
-        args: --acl public-read
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_S3_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_S3_SECRET_ACCESS_KEY }}
-        AWS_REGION: ${{ secrets.AWS_REGION }}
-        AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET_NAME }}
-        SOURCE_DIR: "${{ env.PLUGIN_DIR }}/dist"
-        DEST_DIR: "${{ env.S3_DIR_PATH }}"
+        # Update the deployed plugin versions for successful deployments
+        for plugin in ${DEPLOYED_SUCCESSFULLY[@]}; do
+          VERSION=$(jq -r '.version' "$plugin/package.json")
+          PLUGIN_METADATA_JSON=$(echo $PLUGIN_METADATA_JSON | jq --arg plugin "$plugin" --arg version "$VERSION" '.deployed_plugin_versions[$plugin] += [$version]')
+        done
+
+        # Add new plugins to the metadata
+        for plugin in ${NEW_PLUGINS[@]}; do
+          PLUGIN_METADATA_JSON=$(echo $PLUGIN_METADATA_JSON | jq --arg plugin "$plugin" '.new_plugins += [$plugin]')
+        done
+
+        # Save the updated metadata
+        echo $PLUGIN_METADATA_JSON | jq . > plugins_metadata.json
+        git add plugins_metadata.json
+        git commit -m "Update plugin metadata"
+        git push origin main
