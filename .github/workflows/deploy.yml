@@ -112,7 +112,9 @@ jobs:
         # Update the deployed plugin versions for successful deployments
         for plugin in ${DEPLOYED_SUCCESSFULLY[@]}; do
           VERSION=$(jq -r '.version' "$plugin/package.json")
-          PLUGIN_METADATA_JSON=$(echo $PLUGIN_METADATA_JSON | jq --arg plugin "$plugin" --arg version "$VERSION" '.deployed_plugin_versions[$plugin] += [$version]')
+          # Ensure the deployed versions are an array and then append the version
+          PLUGIN_METADATA_JSON=$(echo $PLUGIN_METADATA_JSON | jq --arg plugin "$plugin" --arg version "$VERSION" \
+            '.deployed_plugin_versions[$plugin] += [$version]')
         done
 
         # Add new plugins to the metadata
