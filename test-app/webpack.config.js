@@ -2,17 +2,14 @@ const HtmlWebPackPlugin = require("html-webpack-plugin");
 const ModuleFederationPlugin = require("webpack/lib/container/ModuleFederationPlugin");
 const path = require('path');
 const Dotenv = require('dotenv-webpack');
-const packageJson = require("./package.json");
-const deps = packageJson.dependencies;
-const version = packageJson.version;
+
+const deps = require("./package.json").dependencies;
 
 const printCompilationMessage = require('./compilation.config.js');
 
 module.exports = (_, argv) => ({
-  output: argv.mode === "production" ? {
-    publicPath: `https://coconut-plugin-architecture.s3.ap-south-1.amazonaws.com/plugins/${packageJson.name}/v${version}/`,
-  } : {
-    publicPath: "http://localhost:2200/",
+  output: {
+    publicPath: "http://localhost:2220/",
   },
 
   resolve: {
@@ -20,7 +17,7 @@ module.exports = (_, argv) => ({
   },
 
   devServer: {
-    port: 2200,
+    port: 2220,
     historyApiFallback: true,
     watchFiles: [path.resolve(__dirname, 'src')],
     onListening: function (devServer) {
@@ -65,13 +62,14 @@ module.exports = (_, argv) => ({
 
   plugins: [
     new ModuleFederationPlugin({
-      name: "app_host",
+      name: "test_app",
       filename: "remoteEntry.js",
       remotes: {
-        "data_management": "data_management@http://localhost:2210/remoteEntry.js",
-        "test_app": "test_app@http://localhost:2220/remoteEntry.js",
+        data_management: "data_management@http://localhost:2210/remoteEntry.js",
       },
-      exposes: {},
+      exposes: {
+        "./RemoteComponent": "./src/RemoteComponent",
+      },
       shared: {
         ...deps,
         react: {
