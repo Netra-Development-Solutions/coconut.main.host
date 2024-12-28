@@ -1,5 +1,5 @@
 import React from "react";
-import DataManagementClass from "data-management";
+import DataManagementClass from "@coconut-packages/data-management";
 import pluginRegistry from "./plugin-registry";
 
 export default class RemoteComponent extends React.Component {
