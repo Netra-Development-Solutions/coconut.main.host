@@ -2,13 +2,16 @@ const HtmlWebPackPlugin = require("html-webpack-plugin");
 const ModuleFederationPlugin = require("webpack/lib/container/ModuleFederationPlugin");
 const path = require('path');
 const Dotenv = require('dotenv-webpack');
+const pluginMetadata = require('./pluginMetadata.json');
 
 const deps = require("./package.json").dependencies;
 
 const printCompilationMessage = require('./compilation.config.js');
 
 module.exports = (_, argv) => ({
-  output: {
+  output: argv.mode === "production" ? {
+    publicPath: `https://coconut-plugin-architecture.s3.ap-south-1.amazonaws.com/plugins/${packageJson.name}/v${version}/`,
+  } : {
     publicPath: "http://localhost:2250/",
   },
 
@@ -64,7 +67,9 @@ module.exports = (_, argv) => ({
     new ModuleFederationPlugin({
       name: "plugin_injector",
       filename: "remoteEntry.js",
-      remotes: {
+      remotes: argv.mode === "production" ? {
+        "data_management": `data_management@https://coconut-plugin-architecture.s3.ap-south-1.amazonaws.com/plugins/data-management/v${pluginMetadata["data_management"]}/remoteEntry.js`,
+      } : {
         "data_management": "data_management@http://localhost:2210/remoteEntry.js",
       },
       exposes: {
