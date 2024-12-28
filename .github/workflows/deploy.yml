@@ -19,7 +19,7 @@ jobs:
     - name: Validate Plugin Input
       id: validate-input
       run: |
-        VALID_PLUGINS=("app-host" "plugin2")
+        VALID_PLUGINS=("app-host" "data-management" "plugin-injector")
         if [[ ! " ${VALID_PLUGINS[@]} " =~ " ${{ github.event.inputs.plugin }} " ]]; then
           echo "Invalid plugin: ${{ github.event.inputs.plugin }}. Valid options are: ${VALID_PLUGINS[@]}"
           exit 1
