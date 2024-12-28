@@ -1,24 +1,26 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import DataManagementService from "data_management/DataManagementService";
-import TestApp from "test_app/RemoteComponent";
+import HeaderNavigation from "header_navigation/HeaderNavigation";
+import SignIn from "user_management/SignIn";
 
 import "./index.css";
 
-const App = () => {
-  DataManagementService.subscribe("auth", (state) => {
-    console.log("auth state", state);
-  })
-  return (
-  <div className="container"> 
-    <div>Name: coconut-app-host</div>
-    <div>Framework: react</div>
-    <div>Language: JavaScript</div>
-    <div>CSS: Empty CSS</div>
-    <div>{JSON.stringify(DataManagementService.getState())}</div>
+window.GUID = function generateGuid() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      var r = Math.random() * 16 | 0,
+          v = (c === 'x' ? r : (r & 0x3 | 0x8));
+      return v.toString(16);
+  });
+}
 
-    <TestApp />    
-  </div>
+const App = () => {
+  DataManagementService.registerModel("auth", { loggedIn: true })
+  return (
+  <>
+    <HeaderNavigation />
+    <SignIn />
+  </>
 )};
 const rootElement = document.getElementById("app")
 if (!rootElement) throw new Error("Failed to find the root element")

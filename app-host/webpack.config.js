@@ -70,6 +70,8 @@ module.exports = (_, argv) => ({
       remotes: {
         "data_management": "data_management@http://localhost:2210/remoteEntry.js",
         "test_app": "test_app@http://localhost:2220/remoteEntry.js",
+        "header_navigation": "header_navigation@http://localhost:2230/remoteEntry.js",
+        "user_management": "user_management@http://localhost:2240/remoteEntry.js",
       },
       exposes: {},
       shared: {

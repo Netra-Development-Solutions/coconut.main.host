@@ -7,21 +7,10 @@ export default class RemoteComponent extends React.Component {
         this.state = {
             data: {}
         };
-        this.DataManagementService = new DataManagementClass({
-            data: {
-                name: "John Doe",
-                email: ""
-            }
-        });
+        this.DataManagementService = new DataManagementClass();
     }
-    
-    componentDidMount() {
-        this.setState({ data: this.DataManagementService.getState() });
-    }
-
     
     render() {
-        console.log(this.state)
         return <div>{JSON.stringify(this.state)}</div>;
     }
 }
