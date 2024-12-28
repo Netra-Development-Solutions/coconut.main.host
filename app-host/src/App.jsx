@@ -1,8 +1,11 @@
-import React from "react";
+import React, { lazy } from "react";
 import ReactDOM from "react-dom/client";
 import DataManagementService from "data_management/DataManagementService";
-import HeaderNavigation from "header_navigation/HeaderNavigation";
-import SignIn from "user_management/SignIn";
+import pluginRegistry from "data_management/pluginRegistry";
+import PluginInjector from "plugin_injector/PluginInjector";
+
+pluginRegistry.register("header_navigation", lazy(() => import("header_navigation/HeaderNavigation")))
+pluginRegistry.register("sign_in", lazy(() => import("user_management/SignIn")))
 
 import "./index.css";
 
@@ -18,8 +21,8 @@ const App = () => {
   DataManagementService.registerModel("auth", { loggedIn: true })
   return (
   <>
-    <HeaderNavigation />
-    <SignIn />
+    <PluginInjector pluginName={"header_navigation"} />
+    <PluginInjector pluginName={"sign_in"} />
   </>
 )};
 const rootElement = document.getElementById("app")

@@ -4,14 +4,12 @@ import DataManagementService from "data_management/DataManagementService";
 import "./index.css";
 
 const App = () => {
+  const widgetId = window.GUID()
+
   useEffect(() => {
     setTimeout(() => {
       console.log("Setting auth state")
-      DataManagementService.setState({
-        "auth": {
-          "loggedIn": true,
-        }
-      })
+      console.log(DataManagementService.getModelData("auth"))
     }, 5000)
   }, [])
 

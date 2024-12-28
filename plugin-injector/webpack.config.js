@@ -9,7 +9,7 @@ const printCompilationMessage = require('./compilation.config.js');
 
 module.exports = (_, argv) => ({
   output: {
-    publicPath: "http://localhost:2210/",
+    publicPath: "http://localhost:2250/",
   },
 
   resolve: {
@@ -17,7 +17,7 @@ module.exports = (_, argv) => ({
   },
 
   devServer: {
-    port: 2210,
+    port: 2250,
     historyApiFallback: true,
     watchFiles: [path.resolve(__dirname, 'src')],
     onListening: function (devServer) {
@@ -62,12 +62,14 @@ module.exports = (_, argv) => ({
 
   plugins: [
     new ModuleFederationPlugin({
-      name: "data_management",
+      name: "plugin_injector",
       filename: "remoteEntry.js",
-      remotes: {},
+      remotes: {
+        "data_management": "data_management@http://localhost:2210/remoteEntry.js",
+      },
       exposes: {
-        "./DataManagementService": "./src/data-management",
-        "./pluginRegistry": "./src/plugin-registry",
+        ".": "./src/PluginInjector",
+        "./PluginInjector": "./src/PluginInjector",
       },
       shared: {
         ...deps,
