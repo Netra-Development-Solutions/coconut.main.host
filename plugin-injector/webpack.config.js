@@ -6,7 +6,6 @@ const pluginMetadata = require('./pluginMetadata.json');
 const packageJson = require("./package.json");
 const deps = packageJson.dependencies;
 const version = packageJson.version;
-const deps = require("./package.json").dependencies;
 
 const printCompilationMessage = require('./compilation.config.js');
 
